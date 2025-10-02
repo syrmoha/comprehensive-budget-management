@@ -1,0 +1,831 @@
+// تطبيق إدارة الميزانية
+class BudgetApp {
+    constructor() {
+        this.transactions = [];
+        this.budgets = [];
+        this.categories = {
+            food: { name: '🍔 طعام', color: '#e74c3c' },
+            transport: { name: '🚕 نقل', color: '#3498db' },
+            shopping: { name: '🛍️ تسوق', color: '#9b59b6' },
+            entertainment: { name: '🎬 ترفيه', color: '#f39c12' },
+            health: { name: '🏥 صحة', color: '#e67e22' },
+            education: { name: '📚 تعليم', color: '#1abc9c' },
+            bills: { name: '💡 فواتير', color: '#34495e' },
+            other: { name: '📦 أخرى', color: '#95a5a6' }
+        };
+
+        this.charts = {};
+        this.currentMonth = new Date().toISOString().slice(0, 7); // YYYY-MM
+
+        this.initializeElements();
+        this.loadData();
+        this.setupEventListeners();
+        this.updateDashboard();
+        this.initializeCharts();
+    }
+
+    // تهيئة عناصر DOM
+    initializeElements() {
+        // النماذج
+        this.incomeModal = document.getElementById('incomeModal');
+        this.expenseModal = document.getElementById('expenseModal');
+        this.budgetModal = document.getElementById('budgetModal');
+
+        this.incomeForm = document.getElementById('incomeForm');
+        this.expenseForm = document.getElementById('expenseForm');
+        this.budgetForm = document.getElementById('budgetForm');
+
+        // الأزرار
+        this.addIncomeBtn = document.getElementById('addIncomeBtn');
+        this.addExpenseBtn = document.getElementById('addExpenseBtn');
+        this.setBudgetBtn = document.getElementById('setBudgetBtn');
+        this.viewReportsBtn = document.getElementById('viewReportsBtn');
+        this.themeToggle = document.getElementById('themeToggle');
+        this.exportData = document.getElementById('exportData');
+        this.importData = document.getElementById('importData');
+        this.importFile = document.getElementById('importFile');
+
+        // الفلاتر
+        this.chartPeriod = document.getElementById('chartPeriod');
+        this.transactionTypeFilter = document.getElementById('transactionTypeFilter');
+        this.transactionCategoryFilter = document.getElementById('transactionCategoryFilter');
+
+        // العناصر الأخرى
+        this.transactionsList = document.getElementById('transactionsList');
+
+        // تعيين التاريخ الافتراضي
+        const today = new Date().toISOString().split('T')[0];
+        document.getElementById('incomeDate').value = today;
+        document.getElementById('expenseDate').value = today;
+        document.getElementById('budgetMonth').value = this.currentMonth;
+    }
+
+    // إعداد المستمعين للأحداث
+    setupEventListeners() {
+        // فتح النماذج
+        this.addIncomeBtn.addEventListener('click', () => this.showModal('income'));
+        this.addExpenseBtn.addEventListener('click', () => this.showModal('expense'));
+        this.setBudgetBtn.addEventListener('click', () => this.showModal('budget'));
+
+        // إرسال النماذج
+        this.incomeForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            this.addTransaction('income');
+        });
+
+        this.expenseForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            this.addTransaction('expense');
+        });
+
+        this.budgetForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            this.setBudget();
+        });
+
+        // إغلاق النماذج
+        document.querySelectorAll('.close-btn, .cancel-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const modal = e.target.closest('.modal');
+                this.hideModal(modal);
+            });
+        });
+
+        // النقر خارج النموذج لإغلاقه
+        document.querySelectorAll('.modal').forEach(modal => {
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) {
+                    this.hideModal(modal);
+                }
+            });
+        });
+
+        // تبديل السمة
+        this.themeToggle.addEventListener('click', () => this.toggleTheme());
+
+        // التصدير والاستيراد
+        this.exportData.addEventListener('click', () => this.exportDataToFile());
+        this.importData.addEventListener('click', () => this.importFile.click());
+        this.importFile.addEventListener('change', (e) => this.importDataFromFile(e));
+
+        // الفلاتر
+        this.chartPeriod.addEventListener('change', () => this.updateCharts());
+        this.transactionTypeFilter.addEventListener('change', () => this.updateTransactionsList());
+        this.transactionCategoryFilter.addEventListener('change', () => this.updateTransactionsList());
+
+        // تحديث الفلاتر عند تغيير نوع العملية
+        this.transactionTypeFilter.addEventListener('change', () => this.updateCategoryFilter());
+    }
+
+    // إضافة عملية جديدة
+    addTransaction(type) {
+        const form = type === 'income' ? this.incomeForm : this.expenseForm;
+        const amount = parseFloat(document.getElementById(`${type}Amount`).value);
+        const date = document.getElementById(`${type}Date`).value;
+
+        const transaction = {
+            id: Date.now().toString(),
+            type: type,
+            amount: amount,
+            date: date,
+            description: document.getElementById(`${type}Description`).value,
+            createdAt: new Date().toISOString()
+        };
+
+        if (type === 'income') {
+            transaction.source = document.getElementById('incomeSource').value;
+        } else {
+            transaction.category = document.getElementById('expenseCategory').value;
+        }
+
+        this.transactions.unshift(transaction);
+        this.saveData();
+        this.updateDashboard();
+        this.hideModal(type === 'income' ? this.incomeModal : this.expenseModal);
+        form.reset();
+
+        this.showNotification(`تم إضافة ${type === 'income' ? 'الدخل' : 'المصروف'} بنجاح`, 'success');
+
+        // التحقق من تجاوز الميزانية
+        this.checkBudgetAlert();
+    }
+
+    // تعيين الميزانية
+    setBudget() {
+        const amount = parseFloat(document.getElementById('budgetAmount').value);
+        const month = document.getElementById('budgetMonth').value;
+        const alertEnabled = document.getElementById('budgetAlert').checked;
+
+        const budget = {
+            id: Date.now().toString(),
+            amount: amount,
+            month: month,
+            alertEnabled: alertEnabled,
+            createdAt: new Date().toISOString()
+        };
+
+        // إزالة الميزانية القديمة لنفس الشهر
+        this.budgets = this.budgets.filter(b => b.month !== month);
+        this.budgets.push(budget);
+
+        this.saveData();
+        this.updateDashboard();
+        this.hideModal(this.budgetModal);
+        this.budgetForm.reset();
+
+        this.showNotification('تم تعيين الميزانية بنجاح', 'success');
+    }
+
+    // حذف عملية
+    deleteTransaction(transactionId) {
+        if (!confirm('هل أنت متأكد من حذف هذه العملية؟')) return;
+
+        this.transactions = this.transactions.filter(t => t.id !== transactionId);
+        this.saveData();
+        this.updateDashboard();
+
+        this.showNotification('تم حذف العملية بنجاح', 'success');
+    }
+
+    // تحرير عملية
+    editTransaction(transactionId) {
+        const transaction = this.transactions.find(t => t.id === transactionId);
+        if (!transaction) return;
+
+        if (transaction.type === 'income') {
+            document.getElementById('incomeAmount').value = transaction.amount;
+            document.getElementById('incomeSource').value = transaction.source;
+            document.getElementById('incomeDate').value = transaction.date;
+            document.getElementById('incomeDescription').value = transaction.description || '';
+            this.showModal('income');
+
+            // حذف العملية القديمة بعد التحرير
+            this.deleteTransaction(transactionId);
+        } else {
+            document.getElementById('expenseAmount').value = transaction.amount;
+            document.getElementById('expenseCategory').value = transaction.category;
+            document.getElementById('expenseDate').value = transaction.date;
+            document.getElementById('expenseDescription').value = transaction.description || '';
+            this.showModal('expense');
+
+            // حذف العملية القديمة بعد التحرير
+            this.deleteTransaction(transactionId);
+        }
+    }
+
+    // تحديث لوحة التحكم
+    updateDashboard() {
+        this.updateSummary();
+        this.updateTransactionsList();
+        this.updateCharts();
+    }
+
+    // تحديث الملخص
+    updateSummary() {
+        const currentMonthTransactions = this.getCurrentMonthTransactions();
+
+        const totalIncome = currentMonthTransactions
+            .filter(t => t.type === 'income')
+            .reduce((sum, t) => sum + t.amount, 0);
+
+        const totalExpense = currentMonthTransactions
+            .filter(t => t.type === 'expense')
+            .reduce((sum, t) => sum + t.amount, 0);
+
+        const balance = totalIncome - totalExpense;
+
+        // تحديث العناصر
+        document.getElementById('totalIncome').textContent = this.formatCurrency(totalIncome);
+        document.getElementById('totalExpense').textContent = this.formatCurrency(totalExpense);
+        document.getElementById('remainingBalance').textContent = this.formatCurrency(balance);
+
+        // تحديث الميزانية
+        this.updateBudgetProgress(totalExpense);
+    }
+
+    // تحديث تقدم الميزانية
+    updateBudgetProgress(totalExpense) {
+        const currentBudget = this.budgets.find(b => b.month === this.currentMonth);
+        const budgetProgress = document.getElementById('budgetProgressFill');
+        const budgetProgressText = document.getElementById('budgetProgressText');
+        const monthlyBudgetElement = document.getElementById('monthlyBudget');
+
+        if (currentBudget) {
+            const progress = (totalExpense / currentBudget.amount) * 100;
+            const displayProgress = Math.min(progress, 100);
+
+            budgetProgress.style.width = `${displayProgress}%`;
+            budgetProgressText.textContent = `${displayProgress.toFixed(1)}%`;
+            monthlyBudgetElement.textContent = this.formatCurrency(currentBudget.amount);
+
+            // تغيير اللون حسب النسبة
+            if (displayProgress >= 100) {
+                budgetProgress.style.background = 'var(--accent-color)';
+            } else if (displayProgress >= 80) {
+                budgetProgress.style.background = 'var(--warning-color)';
+            } else {
+                budgetProgress.style.background = 'linear-gradient(90deg, var(--primary-color), var(--primary-dark))';
+            }
+        } else {
+            budgetProgress.style.width = '0%';
+            budgetProgressText.textContent = '0%';
+            monthlyBudgetElement.textContent = this.formatCurrency(0);
+        }
+    }
+
+    // تحديث قائمة العمليات
+    updateTransactionsList() {
+        const typeFilter = this.transactionTypeFilter.value;
+        const categoryFilter = this.transactionCategoryFilter.value;
+
+        let filteredTransactions = this.transactions;
+
+        // التصفية حسب النوع
+        if (typeFilter !== 'all') {
+            filteredTransactions = filteredTransactions.filter(t => t.type === typeFilter);
+        }
+
+        // التصفية حسب التصنيف (للمصروفات فقط)
+        if (categoryFilter !== 'all') {
+            filteredTransactions = filteredTransactions.filter(t =>
+                t.type !== 'income' && t.category === categoryFilter
+            );
+        }
+
+        // عرض العمليات
+        if (filteredTransactions.length === 0) {
+            this.transactionsList.innerHTML = `
+                <div class="empty-state">
+                    <i class="fas fa-receipt"></i>
+                    <p>لا توجد عمليات لعرضها</p>
+                </div>
+            `;
+        } else {
+            this.transactionsList.innerHTML = filteredTransactions
+                .slice(0, 10) // آخر 10 عمليات فقط
+                .map(transaction => this.createTransactionElement(transaction))
+                .join('');
+        }
+    }
+
+    // تحديث فلاتر التصنيفات
+    updateCategoryFilter() {
+            const typeFilter = this.transactionTypeFilter.value;
+            const categoryFilter = document.getElementById('transactionCategoryFilter');
+
+            if (typeFilter === 'income') {
+                categoryFilter.innerHTML = '<option value="all">جميع التصنيفات</option>';
+                categoryFilter.disabled = true;
+            } else {
+                categoryFilter.innerHTML = `
+                <option value="all">جميع التصنيفات</option>
+                ${Object.entries(this.categories).map(([key, category]) => 
+                    `<option value="${key}">${category.name}</option>`
+                ).join('')}
+            `;
+            categoryFilter.disabled = false;
+        }
+    }
+    
+    // إنشاء عنصر عملية
+    createTransactionElement(transaction) {
+        const isIncome = transaction.type === 'income';
+        const icon = isIncome ? 'fa-arrow-down' : 'fa-arrow-up';
+        const categoryName = isIncome ? transaction.source : this.categories[transaction.category]?.name;
+        
+        return `
+            <div class="transaction-item transaction-${transaction.type}">
+                <div class="transaction-info">
+                    <div class="transaction-icon">
+                        <i class="fas ${icon}"></i>
+                    </div>
+                    <div class="transaction-details">
+                        <h4>${isIncome ? 'دخل' : 'مصروف'}</h4>
+                        <div class="category">${categoryName}</div>
+                        ${transaction.description ? `<div class="description">${transaction.description}</div>` : ''}
+                    </div>
+                </div>
+                <div class="transaction-amount">
+                    ${isIncome ? '+' : '-'} ${this.formatCurrency(transaction.amount)}
+                </div>
+                <div class="transaction-date">
+                    ${this.formatDate(transaction.date)}
+                </div>
+                <div class="transaction-actions">
+                    <button class="edit-btn" onclick="budgetApp.editTransaction('${transaction.id}')">
+                        <i class="fas fa-edit"></i>
+                    </button>
+                    <button class="delete-btn" onclick="budgetApp.deleteTransaction('${transaction.id}')">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </div>
+            </div>
+        `;
+    }
+    
+    // تهيئة الرسوم البيانية
+    initializeCharts() {
+        this.createExpenseChart();
+        this.createComparisonChart();
+        this.createTrendChart();
+    }
+    
+    // تحديث الرسوم البيانية
+    updateCharts() {
+        if (this.charts.expenseChart) {
+            this.charts.expenseChart.destroy();
+        }
+        if (this.charts.comparisonChart) {
+            this.charts.comparisonChart.destroy();
+        }
+        if (this.charts.trendChart) {
+            this.charts.trendChart.destroy();
+        }
+        
+        this.initializeCharts();
+    }
+    
+    // رسم بياني للمصروفات حسب التصنيف
+    createExpenseChart() {
+        const ctx = document.getElementById('expenseChart').getContext('2d');
+        const period = this.chartPeriod.value;
+        const expenses = this.getFilteredTransactions('expense', period);
+        
+        const categoryData = {};
+        expenses.forEach(expense => {
+            const category = expense.category;
+            if (!categoryData[category]) {
+                categoryData[category] = 0;
+            }
+            categoryData[category] += expense.amount;
+        });
+        
+        const labels = Object.keys(categoryData).map(key => this.categories[key]?.name);
+        const data = Object.values(categoryData);
+        const backgroundColors = Object.keys(categoryData).map(key => this.categories[key]?.color);
+        
+        this.charts.expenseChart = new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: labels,
+                datasets: [{
+                    data: data,
+                    backgroundColor: backgroundColors,
+                    borderWidth: 2,
+                    borderColor: '#fff'
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                        rtl: true
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: (context) => {
+                                const value = context.raw;
+                                const total = data.reduce((a, b) => a + b, 0);
+                                const percentage = ((value / total) * 100).toFixed(1);
+                                return `${this.formatCurrency(value)} (${percentage}%)`;
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    }
+    
+    // رسم بياني للمقارنة بين الدخل والمصروفات
+    createComparisonChart() {
+        const ctx = document.getElementById('comparisonChart').getContext('2d');
+        const period = this.chartPeriod.value;
+        
+        const months = this.getMonths(period);
+        const incomeData = months.map(month => 
+            this.getMonthlyTotal('income', month)
+        );
+        const expenseData = months.map(month => 
+            this.getMonthlyTotal('expense', month)
+        );
+        
+        this.charts.comparisonChart = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: months.map(month => this.formatMonth(month)),
+                datasets: [
+                    {
+                        label: 'الدخل',
+                        data: incomeData,
+                        backgroundColor: 'rgba(46, 204, 113, 0.8)',
+                        borderColor: 'rgba(46, 204, 113, 1)',
+                        borderWidth: 1
+                    },
+                    {
+                        label: 'المصروفات',
+                        data: expenseData,
+                        backgroundColor: 'rgba(231, 76, 60, 0.8)',
+                        borderColor: 'rgba(231, 76, 60, 1)',
+                        borderWidth: 1
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    x: {
+                        grid: {
+                            display: false
+                        }
+                    },
+                    y: {
+                        beginAtZero: true,
+                        ticks: {
+                            callback: (value) => this.formatCurrency(value)
+                        }
+                    }
+                },
+                plugins: {
+                    tooltip: {
+                        callbacks: {
+                            label: (context) => {
+                                return `${context.dataset.label}: ${this.formatCurrency(context.raw)}`;
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    }
+    
+    // رسم بياني للاتجاه المالي
+    createTrendChart() {
+        const ctx = document.getElementById('trendChart').getContext('2d');
+        const period = this.chartPeriod.value;
+        
+        const months = this.getMonths(period);
+        const balanceData = months.map(month => {
+            const income = this.getMonthlyTotal('income', month);
+            const expense = this.getMonthlyTotal('expense', month);
+            return income - expense;
+        });
+        
+        this.charts.trendChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: months.map(month => this.formatMonth(month)),
+                datasets: [{
+                    label: 'الرصيد',
+                    data: balanceData,
+                    borderColor: 'rgba(52, 152, 219, 1)',
+                    backgroundColor: 'rgba(52, 152, 219, 0.1)',
+                    borderWidth: 3,
+                    fill: true,
+                    tension: 0.4
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    x: {
+                        grid: {
+                            display: false
+                        }
+                    },
+                    y: {
+                        ticks: {
+                            callback: (value) => this.formatCurrency(value)
+                        }
+                    }
+                },
+                plugins: {
+                    tooltip: {
+                        callbacks: {
+                            label: (context) => {
+                                return `الرصيد: ${this.formatCurrency(context.raw)}`;
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    }
+    
+    // التحقق من تنبيهات الميزانية
+    checkBudgetAlert() {
+        const currentBudget = this.budgets.find(b => b.month === this.currentMonth);
+        if (!currentBudget || !currentBudget.alertEnabled) return;
+        
+        const currentMonthExpenses = this.getCurrentMonthTransactions()
+            .filter(t => t.type === 'expense')
+            .reduce((sum, t) => sum + t.amount, 0);
+        
+        const progress = (currentMonthExpenses / currentBudget.amount) * 100;
+        
+        if (progress >= 80 && progress < 100) {
+            this.showNotification(
+                `تحذير: لقد استهلكت ${progress.toFixed(1)}% من ميزانيتك الشهرية!`,
+                'warning'
+            );
+        } else if (progress >= 100) {
+            this.showNotification(
+                `تحذير: لقد تجاوزت ميزانيتك الشهرية بنسبة ${(progress - 100).toFixed(1)}%!`,
+                'error'
+            );
+        }
+    }
+    
+    // عرض النموذج
+    showModal(type) {
+        const modal = document.getElementById(`${type}Modal`);
+        modal.classList.add('show');
+        
+        // تعيين التاريخ الافتراضي
+        const today = new Date().toISOString().split('T')[0];
+        if (type !== 'budget') {
+            document.getElementById(`${type}Date`).value = today;
+        }
+    }
+    
+    // إخفاء النموذج
+    hideModal(modal) {
+        modal.classList.remove('show');
+    }
+    
+    // تبديل السمة
+    toggleTheme() {
+        const currentTheme = document.body.getAttribute('data-theme');
+        const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+        
+        document.body.setAttribute('data-theme', newTheme);
+        localStorage.setItem('budgetTheme', newTheme);
+        
+        const icon = this.themeToggle.querySelector('i');
+        icon.className = newTheme === 'dark' ? 'fas fa-sun' : 'fas fa-moon';
+        
+        this.showNotification(`تم التبديل إلى الوضع ${newTheme === 'dark' ? 'الليلي' : 'النهاري'}`, 'info');
+        
+        // إعادة رسم الرسوم البيانية
+        setTimeout(() => this.updateCharts(), 300);
+    }
+    
+    // تحميل السمة
+    loadTheme() {
+        const savedTheme = localStorage.getItem('budgetTheme') || 'light';
+        document.body.setAttribute('data-theme', savedTheme);
+        
+        const icon = this.themeToggle.querySelector('i');
+        if (icon) {
+            icon.className = savedTheme === 'dark' ? 'fas fa-sun' : 'fas fa-moon';
+        }
+    }
+    
+    // تصدير البيانات
+    exportDataToFile() {
+        const data = {
+            transactions: this.transactions,
+            budgets: this.budgets,
+            exportDate: new Date().toISOString()
+        };
+        
+        const dataStr = JSON.stringify(data, null, 2);
+        const dataBlob = new Blob([dataStr], { type: 'application/json' });
+        
+        const url = URL.createObjectURL(dataBlob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `budget-data-${new Date().toISOString().split('T')[0]}.json`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+        
+        this.showNotification('تم تصدير البيانات بنجاح', 'success');
+    }
+    
+    // استيراد البيانات
+    importDataFromFile(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+        
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            try {
+                const importedData = JSON.parse(e.target.result);
+                
+                if (importedData.transactions) {
+                    this.transactions = importedData.transactions;
+                }
+                if (importedData.budgets) {
+                    this.budgets = importedData.budgets;
+                }
+                
+                this.saveData();
+                this.updateDashboard();
+                
+                this.showNotification('تم استيراد البيانات بنجاح', 'success');
+            } catch (error) {
+                this.showNotification('خطأ في استيراد الملف. تأكد من صحة التنسيق', 'error');
+                console.error('استيراد البيانات فشل:', error);
+            }
+            
+            event.target.value = '';
+        };
+        
+        reader.readAsText(file);
+    }
+    
+    // حفظ البيانات
+    saveData() {
+        const data = {
+            transactions: this.transactions,
+            budgets: this.budgets,
+            version: '1.0'
+        };
+        localStorage.setItem('budgetData', JSON.stringify(data));
+    }
+    
+    // تحميل البيانات
+    loadData() {
+        const savedData = localStorage.getItem('budgetData');
+        if (savedData) {
+            try {
+                const data = JSON.parse(savedData);
+                this.transactions = data.transactions || [];
+                this.budgets = data.budgets || [];
+            } catch (e) {
+                console.error('Error loading data:', e);
+                this.transactions = [];
+                this.budgets = [];
+            }
+        }
+    }
+    
+    // أدوات مساعدة
+    getCurrentMonthTransactions() {
+        return this.transactions.filter(t => 
+            t.date.startsWith(this.currentMonth)
+        );
+    }
+    
+    getFilteredTransactions(type, period) {
+        let transactions = this.transactions.filter(t => t.type === type);
+        
+        if (period === 'month') {
+            transactions = transactions.filter(t => t.date.startsWith(this.currentMonth));
+        } else if (period === 'year') {
+            const currentYear = new Date().getFullYear();
+            transactions = transactions.filter(t => t.date.startsWith(currentYear));
+        }
+        // 'all' لا يحتاج تصفية
+        
+        return transactions;
+    }
+    
+    getMonths(period) {
+        const months = [];
+        const currentDate = new Date();
+        
+        if (period === 'month') {
+            months.push(this.currentMonth);
+        } else if (period === 'year') {
+            for (let i = 0; i < 12; i++) {
+                const date = new Date(currentDate.getFullYear(), i, 1);
+                months.push(date.toISOString().slice(0, 7));
+            }
+        } else { // all
+            // الحصول على جميع الأشهر الفريدة من البيانات
+            const allMonths = [...new Set(this.transactions.map(t => t.date.slice(0, 7)))];
+            months.push(...allMonths.sort().slice(-12)); // آخر 12 شهر
+        }
+        
+        return months;
+    }
+    
+    getMonthlyTotal(type, month) {
+        return this.transactions
+            .filter(t => t.type === type && t.date.startsWith(month))
+            .reduce((sum, t) => sum + t.amount, 0);
+    }
+    
+    formatCurrency(amount) {
+        return new Intl.NumberFormat('ar-SY', {
+            style: 'decimal',
+            minimumFractionDigits: 0,
+            maximumFractionDigits: 0
+        }).format(amount) + ' ل.س';
+    }
+    
+    formatDate(dateString) {
+        return new Date(dateString).toLocaleDateString('ar-EG');
+    }
+    
+    formatMonth(monthString) {
+        const date = new Date(monthString + '-01');
+        return date.toLocaleDateString('ar-EG', { year: 'numeric', month: 'long' });
+    }
+    
+    // عرض الإشعارات
+    showNotification(message, type = 'info') {
+        // إزالة الإشعارات السابقة
+        const existingNotification = document.querySelector('.notification');
+        if (existingNotification) {
+            existingNotification.remove();
+        }
+        
+        // إنشاء إشعار جديد
+        const notification = document.createElement('div');
+        notification.className = 'notification';
+        notification.textContent = message;
+        
+        // إضافة الأنماط
+        const backgroundColor = type === 'error' ? '#e74c3c' : 
+                              type === 'warning' ? '#f39c12' : 
+                              type === 'success' ? '#2ecc71' : '#3498db';
+        
+        notification.style.cssText = `
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            background: ${backgroundColor};
+            color: white;
+            padding: 15px 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            z-index: 10000;
+            transform: translateX(-100%);
+            opacity: 0;
+            transition: transform 0.3s, opacity 0.3s;
+            max-width: 400px;
+        `;
+        
+        document.body.appendChild(notification);
+        
+        // عرض الإشعار
+        setTimeout(() => {
+            notification.style.transform = 'translateX(0)';
+            notification.style.opacity = '1';
+        }, 100);
+        
+        // إخفاء الإشعار بعد 4 ثوان
+        setTimeout(() => {
+            notification.style.transform = 'translateX(-100%)';
+            notification.style.opacity = '0';
+            setTimeout(() => {
+                if (notification.parentNode) {
+                    notification.parentNode.removeChild(notification);
+                }
+            }, 300);
+        }, 4000);
+    }
+}
+
+// تهيئة التطبيق عند تحميل الصفحة
+document.addEventListener('DOMContentLoaded', () => {
+    window.budgetApp = new BudgetApp();
+    window.budgetApp.loadTheme();
+});
