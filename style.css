@@ -90,6 +90,23 @@ header h1 i {
     align-items: center;
 }
 
+.currency-selector {
+    padding: 8px 12px;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    background: var(--bg-color);
+    color: var(--text-color);
+    font-size: 0.95rem;
+    font-family: inherit;
+    cursor: pointer;
+    transition: var(--transition);
+}
+
+.currency-selector:focus {
+    outline: none;
+    border-color: var(--primary-color);
+}
+
 
 /* ملخص الميزانية */
 
