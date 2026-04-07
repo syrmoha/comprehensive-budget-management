@@ -17,6 +17,16 @@ class BudgetApp {
         this.charts = {};
         this.currentMonth = new Date().toISOString().slice(0, 7); // YYYY-MM
 
+        this.currencies = {
+            'USD': { locale: 'en-US', symbol: '$', suffix: false },
+            'SYP': { locale: 'ar-SY', symbol: 'ل.س', suffix: true },
+            'SAR': { locale: 'ar-SA', symbol: 'ر.س', suffix: true },
+            'AED': { locale: 'ar-AE', symbol: 'د.إ', suffix: true },
+            'EGP': { locale: 'ar-EG', symbol: 'ج.م', suffix: true },
+            'EUR': { locale: 'en-IE', symbol: '€', suffix: false }
+        };
+        this.currentCurrency = localStorage.getItem('budgetCurrency') || 'USD';
+
         this.initializeElements();
         this.loadData();
         this.setupEventListeners();
@@ -41,6 +51,12 @@ class BudgetApp {
         this.setBudgetBtn = document.getElementById('setBudgetBtn');
         this.viewReportsBtn = document.getElementById('viewReportsBtn');
         this.themeToggle = document.getElementById('themeToggle');
+        this.currencySelector = document.getElementById('currencySelector');
+        
+        if (this.currencySelector) {
+            this.currencySelector.value = this.currentCurrency;
+        }
+
         this.exportData = document.getElementById('exportData');
         this.importData = document.getElementById('importData');
         this.importFile = document.getElementById('importFile');
@@ -102,6 +118,10 @@ class BudgetApp {
 
         // تبديل السمة
         this.themeToggle.addEventListener('click', () => this.toggleTheme());
+
+        if (this.currencySelector) {
+            this.currencySelector.addEventListener('change', (e) => this.changeCurrency(e.target.value));
+        }
 
         // التصدير والاستيراد
         this.exportData.addEventListener('click', () => this.exportDataToFile());
@@ -753,11 +773,28 @@ class BudgetApp {
     }
     
     formatCurrency(amount) {
-        return new Intl.NumberFormat('ar-SY', {
+        const currencySetting = this.currencies[this.currentCurrency] || this.currencies['USD'];
+        
+        let formattedStr = new Intl.NumberFormat(currencySetting.locale, {
             style: 'decimal',
             minimumFractionDigits: 0,
-            maximumFractionDigits: 0
-        }).format(amount) + ' ل.س';
+            maximumFractionDigits: 2
+        }).format(amount);
+        
+        if (currencySetting.suffix) {
+            return formattedStr + ' ' + currencySetting.symbol;
+        } else {
+            return currencySetting.symbol + formattedStr;
+        }
+    }
+    
+    changeCurrency(newCurrency) {
+        this.currentCurrency = newCurrency;
+        localStorage.setItem('budgetCurrency', newCurrency);
+        this.updateDashboard();
+        
+        // إعادة رسم الرسوم البيانية لتحديث العملة
+        setTimeout(() => this.updateCharts(), 100);
     }
     
     formatDate(dateString) {
