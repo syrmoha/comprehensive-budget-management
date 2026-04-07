@@ -17,6 +17,14 @@
             <div class="header-main">
                 <h1><i class="fas fa-wallet"></i> مدير الميزانية</h1>
                 <div class="header-controls">
+                    <select id="currencySelector" class="currency-selector">
+                        <option value="USD">دولار (USD)</option>
+                        <option value="SYP">ليرة سورية (SYP)</option>
+                        <option value="SAR">ريال سعودي (SAR)</option>
+                        <option value="AED">درهم إماراتي (AED)</option>
+                        <option value="EGP">جنيه مصري (EGP)</option>
+                        <option value="EUR">يورو (EUR)</option>
+                    </select>
                     <button id="themeToggle" class="btn-icon">
                         <i class="fas fa-moon"></i>
                     </button>
@@ -172,8 +180,8 @@
             </div>
             <form id="incomeForm" class="modal-form">
                 <div class="form-group">
-                    <label for="incomeAmount">المبلغ (ل.س)</label>
-                    <input type="number" id="incomeAmount" min="0" step="100" required>
+                    <label for="incomeAmount">المبلغ</label>
+                    <input type="number" id="incomeAmount" min="0" step="1" required>
                 </div>
                 <div class="form-group">
                     <label for="incomeSource">مصدر الدخل</label>
@@ -203,8 +211,8 @@
             </div>
             <form id="expenseForm" class="modal-form">
                 <div class="form-group">
-                    <label for="expenseAmount">المبلغ (ل.س)</label>
-                    <input type="number" id="expenseAmount" min="0" step="100" required>
+                    <label for="expenseAmount">المبلغ</label>
+                    <input type="number" id="expenseAmount" min="0" step="1" required>
                 </div>
                 <div class="form-group">
                     <label for="expenseCategory">التصنيف</label>
@@ -243,8 +251,8 @@
             </div>
             <form id="budgetForm" class="modal-form">
                 <div class="form-group">
-                    <label for="budgetAmount">المبلغ الشهري (ل.س)</label>
-                    <input type="number" id="budgetAmount" min="0" step="1000" required>
+                    <label for="budgetAmount">المبلغ الشهري</label>
+                    <input type="number" id="budgetAmount" min="0" step="10" required>
                 </div>
                 <div class="form-group">
                     <label for="budgetMonth">الشهر</label>
