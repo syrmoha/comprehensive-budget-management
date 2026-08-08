@@ -1,4 +1,3 @@
-// تطبيق إدارة الميزانية
 class BudgetApp {
     constructor() {
         this.transactions = [];
@@ -34,9 +33,7 @@ class BudgetApp {
         this.initializeCharts();
     }
 
-    // تهيئة عناصر DOM
     initializeElements() {
-        // النماذج
         this.incomeModal = document.getElementById('incomeModal');
         this.expenseModal = document.getElementById('expenseModal');
         this.budgetModal = document.getElementById('budgetModal');
@@ -61,29 +58,23 @@ class BudgetApp {
         this.importData = document.getElementById('importData');
         this.importFile = document.getElementById('importFile');
 
-        // الفلاتر
         this.chartPeriod = document.getElementById('chartPeriod');
         this.transactionTypeFilter = document.getElementById('transactionTypeFilter');
         this.transactionCategoryFilter = document.getElementById('transactionCategoryFilter');
 
-        // العناصر الأخرى
         this.transactionsList = document.getElementById('transactionsList');
 
-        // تعيين التاريخ الافتراضي
         const today = new Date().toISOString().split('T')[0];
         document.getElementById('incomeDate').value = today;
         document.getElementById('expenseDate').value = today;
         document.getElementById('budgetMonth').value = this.currentMonth;
     }
 
-    // إعداد المستمعين للأحداث
     setupEventListeners() {
-        // فتح النماذج
         this.addIncomeBtn.addEventListener('click', () => this.showModal('income'));
         this.addExpenseBtn.addEventListener('click', () => this.showModal('expense'));
         this.setBudgetBtn.addEventListener('click', () => this.showModal('budget'));
 
-        // إرسال النماذج
         this.incomeForm.addEventListener('submit', (e) => {
             e.preventDefault();
             this.addTransaction('income');
@@ -99,7 +90,6 @@ class BudgetApp {
             this.setBudget();
         });
 
-        // إغلاق النماذج
         document.querySelectorAll('.close-btn, .cancel-btn').forEach(btn => {
             btn.addEventListener('click', (e) => {
                 const modal = e.target.closest('.modal');
@@ -116,28 +106,23 @@ class BudgetApp {
             });
         });
 
-        // تبديل السمة
         this.themeToggle.addEventListener('click', () => this.toggleTheme());
 
         if (this.currencySelector) {
             this.currencySelector.addEventListener('change', (e) => this.changeCurrency(e.target.value));
         }
 
-        // التصدير والاستيراد
         this.exportData.addEventListener('click', () => this.exportDataToFile());
         this.importData.addEventListener('click', () => this.importFile.click());
         this.importFile.addEventListener('change', (e) => this.importDataFromFile(e));
 
-        // الفلاتر
         this.chartPeriod.addEventListener('change', () => this.updateCharts());
         this.transactionTypeFilter.addEventListener('change', () => this.updateTransactionsList());
         this.transactionCategoryFilter.addEventListener('change', () => this.updateTransactionsList());
 
-        // تحديث الفلاتر عند تغيير نوع العملية
         this.transactionTypeFilter.addEventListener('change', () => this.updateCategoryFilter());
     }
 
-    // إضافة عملية جديدة
     addTransaction(type) {
         const form = type === 'income' ? this.incomeForm : this.expenseForm;
         const amount = parseFloat(document.getElementById(`${type}Amount`).value);
@@ -166,11 +151,9 @@ class BudgetApp {
 
         this.showNotification(`تم إضافة ${type === 'income' ? 'الدخل' : 'المصروف'} بنجاح`, 'success');
 
-        // التحقق من تجاوز الميزانية
         this.checkBudgetAlert();
     }
 
-    // تعيين الميزانية
     setBudget() {
         const amount = parseFloat(document.getElementById('budgetAmount').value);
         const month = document.getElementById('budgetMonth').value;
@@ -196,7 +179,6 @@ class BudgetApp {
         this.showNotification('تم تعيين الميزانية بنجاح', 'success');
     }
 
-    // حذف عملية
     deleteTransaction(transactionId) {
         if (!confirm('هل أنت متأكد من حذف هذه العملية؟')) return;
 
@@ -240,7 +222,6 @@ class BudgetApp {
         this.updateCharts();
     }
 
-    // تحديث الملخص
     updateSummary() {
         const currentMonthTransactions = this.getCurrentMonthTransactions();
 
@@ -254,12 +235,10 @@ class BudgetApp {
 
         const balance = totalIncome - totalExpense;
 
-        // تحديث العناصر
         document.getElementById('totalIncome').textContent = this.formatCurrency(totalIncome);
         document.getElementById('totalExpense').textContent = this.formatCurrency(totalExpense);
         document.getElementById('remainingBalance').textContent = this.formatCurrency(balance);
 
-        // تحديث الميزانية
         this.updateBudgetProgress(totalExpense);
     }
 
@@ -300,12 +279,10 @@ class BudgetApp {
 
         let filteredTransactions = this.transactions;
 
-        // التصفية حسب النوع
         if (typeFilter !== 'all') {
             filteredTransactions = filteredTransactions.filter(t => t.type === typeFilter);
         }
 
-        // التصفية حسب التصنيف (للمصروفات فقط)
         if (categoryFilter !== 'all') {
             filteredTransactions = filteredTransactions.filter(t =>
                 t.type !== 'income' && t.category === categoryFilter
@@ -347,7 +324,6 @@ class BudgetApp {
         }
     }
     
-    // إنشاء عنصر عملية
     createTransactionElement(transaction) {
         const isIncome = transaction.type === 'income';
         const icon = isIncome ? 'fa-arrow-down' : 'fa-arrow-up';
@@ -383,14 +359,12 @@ class BudgetApp {
         `;
     }
     
-    // تهيئة الرسوم البيانية
     initializeCharts() {
         this.createExpenseChart();
         this.createComparisonChart();
         this.createTrendChart();
     }
     
-    // تحديث الرسوم البيانية
     updateCharts() {
         if (this.charts.expenseChart) {
             this.charts.expenseChart.destroy();
@@ -405,7 +379,6 @@ class BudgetApp {
         this.initializeCharts();
     }
     
-    // رسم بياني للمصروفات حسب التصنيف
     createExpenseChart() {
         const ctx = document.getElementById('expenseChart').getContext('2d');
         const period = this.chartPeriod.value;
@@ -599,12 +572,10 @@ class BudgetApp {
         }
     }
     
-    // عرض النموذج
     showModal(type) {
         const modal = document.getElementById(`${type}Modal`);
         modal.classList.add('show');
         
-        // تعيين التاريخ الافتراضي
         const today = new Date().toISOString().split('T')[0];
         if (type !== 'budget') {
             document.getElementById(`${type}Date`).value = today;
@@ -741,7 +712,6 @@ class BudgetApp {
             const currentYear = new Date().getFullYear();
             transactions = transactions.filter(t => t.date.startsWith(currentYear));
         }
-        // 'all' لا يحتاج تصفية
         
         return transactions;
     }
@@ -757,8 +727,7 @@ class BudgetApp {
                 const date = new Date(currentDate.getFullYear(), i, 1);
                 months.push(date.toISOString().slice(0, 7));
             }
-        } else { // all
-            // الحصول على جميع الأشهر الفريدة من البيانات
+        } else { 
             const allMonths = [...new Set(this.transactions.map(t => t.date.slice(0, 7)))];
             months.push(...allMonths.sort().slice(-12)); // آخر 12 شهر
         }
@@ -808,7 +777,6 @@ class BudgetApp {
     
     // عرض الإشعارات
     showNotification(message, type = 'info') {
-        // إزالة الإشعارات السابقة
         const existingNotification = document.querySelector('.notification');
         if (existingNotification) {
             existingNotification.remove();
@@ -848,7 +816,6 @@ class BudgetApp {
             notification.style.opacity = '1';
         }, 100);
         
-        // إخفاء الإشعار بعد 4 ثوان
         setTimeout(() => {
             notification.style.transform = 'translateX(-100%)';
             notification.style.opacity = '0';
